@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Proof Gallery | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Removed inline Tailwind config
+  </script>
+  <script src="assets/js/tailwind-config.js"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Header -->
+    <div class="border-b border-slate-200 pb-5">
+      <h2 class="font-extrabold text-2xl text-slate-800 tracking-tight">Photo Gallery</h2>
+      <p class="text-xs text-slate-500 font-medium">Audit visual proof of work uploaded from field sites</p>
+    </div>
+
+    <!-- Filter Control Panel -->
+    <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Filter Date -->
+        <div>
+          <label for="filter-date" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Date</label>
+          <input type="date" id="filter-date" onchange="loadPhotos()" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+        </div>
+
+        <!-- Filter Worker -->
+        <div>
+          <label for="filter-worker" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Worker</label>
+          <select id="filter-worker" onchange="loadPhotos()" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm bg-white">
+            <option value="">All Workers</option>
+          </select>
+        </div>
+
+        <!-- Filter Site -->
+        <div>
+          <label for="filter-site" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Job Site</label>
+          <select id="filter-site" onchange="loadPhotos()" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm bg-white">
+            <option value="">All Sites</option>
+          </select>
+        </div>
+
+        <!-- Reset buttons -->
+        <div class="flex items-end justify-start sm:justify-end gap-3 pb-0.5">
+          <button onclick="resetFilters()" class="w-full sm:w-auto px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-semibold transition cursor-pointer">
+            Clear Filters
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Photo Gallery Grid -->
+    <div id="photos-gallery-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Loader Skeletons -->
+      <div class="bg-white rounded-xl border border-slate-100 overflow-hidden skeleton h-80"></div>
+      <div class="bg-white rounded-xl border border-slate-100 overflow-hidden skeleton h-80"></div>
+      <div class="bg-white rounded-xl border border-slate-100 overflow-hidden skeleton h-80"></div>
+    </div>
+
+  </main>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Populate filters dropdown
+      await populateFilters();
+
+      // 2. Fetch photos list
+      await loadPhotos();
+    });
+
+    async function populateFilters() {
+      if (!window.supabaseInstance) return;
+
+      try {
+        // Fetch workers
+        const { data: workers } = await window.supabaseInstance
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'worker')
+          .order('full_name', { ascending: true });
+
+        const workerSelect = document.getElementById('filter-worker');
+        if (workers) {
+          workers.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id;
+            opt.innerText = w.full_name;
+            workerSelect.appendChild(opt);
+          });
+        }
+
+        // Fetch sites
+        const { data: sites } = await window.supabaseInstance
+          .from('sites')
+          .select('id, site_name')
+          .order('site_name', { ascending: true });
+
+        const siteSelect = document.getElementById('filter-site');
+        if (sites) {
+          sites.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.innerText = s.site_name;
+            siteSelect.appendChild(opt);
+          });
+        }
+      } catch (err) {
+        console.error("Error populating dropdown filters:", err);
+      }
+    }
+
+    async function loadPhotos() {
+      if (!window.supabaseInstance) return;
+
+      const container = document.getElementById('photos-gallery-container');
+      container.innerHTML = `
+        <div class="col-span-full py-16 text-center text-slate-400 font-medium">
+          <div class="flex items-center justify-center gap-2">
+            <i data-lucide="loader-2" class="w-5 h-5 animate-spin text-blue-600"></i>
+            <span>Filtering gallery proofs...</span>
+          </div>
+        </div>
+      `;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+
+      const dateVal = document.getElementById('filter-date').value;
+      const workerVal = document.getElementById('filter-worker').value;
+      const siteVal = document.getElementById('filter-site').value;
+
+      try {
+        // Base query
+        let query = window.supabaseInstance
+          .from('photo_uploads')
+          .select('*, profiles(full_name, email), sites(site_name)')
+          .order('uploaded_at', { ascending: false });
+
+        if (dateVal) {
+          // Compare dates by converting uploaded_at timestamp to DATE
+          query = query.gte('uploaded_at', `${dateVal}T00:00:00`).lte('uploaded_at', `${dateVal}T23:59:59`);
+        }
+        if (workerVal) {
+          query = query.eq('worker_id', workerVal);
+        }
+        if (siteVal) {
+          query = query.eq('site_id', siteVal);
+        }
+
+        const { data: photos, error } = await query;
+        if (error) throw error;
+
+        container.innerHTML = '';
+
+        if (photos && photos.length > 0) {
+          photos.forEach(photo => {
+            const workerName = photo.profiles ? photo.profiles.full_name : 'Unknown Worker';
+            const siteName = photo.sites ? photo.sites.site_name : 'Unknown Site';
+            
+            const timeObj = new Date(photo.uploaded_at);
+            const timeFmt = timeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const dateFmt = timeObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+            let locationBtn = '';
+            if (photo.latitude && photo.longitude) {
+              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${photo.latitude},${photo.longitude}`;
+              locationBtn = `
+                <a href="${mapsUrl}" target="_blank" class="text-xs font-bold text-blue-600 hover:text-blue-900 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md transition flex items-center gap-1 shadow-sm" title="Show coordinates on external map">
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5"></i> Open Maps
+                </a>
+              `;
+            }
+
+            const card = document.createElement('div');
+            card.className = "bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm flex flex-col justify-between group hover:shadow-md transition duration-300";
+            card.innerHTML = `
+              <!-- Header info card -->
+              <div class="p-4 flex items-center justify-between border-b border-slate-50">
+                <div class="flex items-center gap-3 overflow-hidden">
+                  <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-xs flex-shrink-0">
+                    ${workerName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                  <div class="overflow-hidden">
+                    <span class="font-bold text-xs text-slate-800 block truncate leading-snug">${workerName}</span>
+                    <span class="text-[9px] text-slate-400 font-semibold uppercase block truncate">${siteName}</span>
+                  </div>
+                </div>
+                
+                <div class="text-right flex-shrink-0">
+                  <span class="text-[10px] font-bold text-slate-400 block">${dateFmt}</span>
+                  <span class="text-[10px] text-slate-400 font-medium block">${timeFmt}</span>
+                </div>
+              </div>
+
+              <!-- Main image view -->
+              <div class="relative overflow-hidden aspect-[4/3] bg-slate-50 border-b border-slate-50">
+                <img src="${photo.image_url}" alt="Work proof photo" class="w-full h-full object-cover group-hover:scale-103 transition duration-500 ease-out" />
+              </div>
+
+              <!-- Caption & Location -->
+              <div class="p-4 space-y-3">
+                <p class="text-xs text-slate-600 italic leading-relaxed font-medium">
+                  "${photo.caption || 'No description provided'}"
+                </p>
+                <div class="flex items-center justify-end border-t border-slate-50 pt-3">
+                  ${locationBtn}
+                </div>
+              </div>
+            `;
+            container.appendChild(card);
+          });
+        } else {
+          container.innerHTML = `
+            <div class="col-span-full py-16 text-center text-slate-400 font-medium bg-white rounded-xl border border-slate-100">
+              No photos uploaded matching the selected filters.
+            </div>
+          `;
+        }
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+      } catch (err) {
+        showToast(err.message || "Failed to query photo gallery.", "error");
+      }
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-date').value = '';
+      document.getElementById('filter-worker').value = '';
+      document.getElementById('filter-site').value = '';
+      loadPhotos();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Tejal Enterprises </title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 flex flex-col min-h-screen relative">
+
+  <!-- Settings Configuration Trigger (for setting up Supabase URL/Key) -->
+  <button onclick="toggleConfigModal(true)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition p-2.5 rounded-full border border-slate-200 bg-white shadow-sm" title="Configure Database Connection">
+    <i data-lucide="settings" class="w-5.5 h-5.5"></i>
+  </button>
+
+  <div class="flex-grow flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden transform transition duration-300">
+      
+      <!-- Brand Header -->
+      <div class="bg-slate-900 text-white px-6 py-8 text-center relative">
+        <!-- Background decorative details -->
+        <div class="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px] opacity-10"></div>
+        
+        <div class="inline-flex items-center justify-center bg-blue-600 p-3.5 rounded-xl shadow-lg mb-3.5 relative z-10">
+          <i data-lucide="zap" class="w-8 h-8 text-white"></i>
+        </div>
+        <h1 class="text-2xl font-extrabold tracking-wider relative z-10">TEJAL ENTERPRISES</h1>
+        <p class="text-xs text-slate-400 font-medium mt-1 uppercase tracking-widest relative z-10">Workforce Management</p>
+      </div>
+
+      <!-- Login Form -->
+      <div class="p-6 sm:p-8">
+        <form id="login-form" class="space-y-5">
+          <!-- Connection Warning Alert if not configured -->
+          <div id="config-alert" class="hidden bg-amber-50 border border-amber-200 text-amber-800 p-3.5 rounded-lg text-sm flex gap-2.5">
+            <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0 text-amber-500"></i>
+            <div>
+              <span class="font-semibold">Setup Required:</span> Connect your Supabase instance to login. Click the settings button in the top right.
+            </div>
+          </div>
+
+          <div>
+            <label for="email" class="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                <i data-lucide="mail" class="w-5 h-5"></i>
+              </span>
+              <input type="email" id="email" required placeholder="name@electrician.com" class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-sm placeholder-slate-400 transition" />
+            </div>
+          </div>
+
+          <div>
+            <label for="password" class="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                <i data-lucide="lock" class="w-5 h-5"></i>
+              </span>
+              <input type="password" id="password" required placeholder="••••••••" class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-sm placeholder-slate-400 transition" />
+            </div>
+          </div>
+
+          <button type="submit" id="submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg shadow-md shadow-blue-100 hover:shadow-lg transition flex items-center justify-center gap-2">
+            <span>Sign In</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Connection Configuration Modal -->
+  <div id="config-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="config-modal-content">
+      
+      <div class="bg-slate-900 text-white px-6 py-5 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="database" class="w-5 h-5 text-blue-400"></i>
+          <h2 class="font-bold text-lg">Supabase Configuration</h2>
+        </div>
+        <button onclick="toggleConfigModal(false)" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Provide your Supabase URL and Anonymous Public Key. This will be stored locally in your browser's <code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">localStorage</code>. For production deployments, hardcode these constants inside the <code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">assets/js/supabase-client.js</code> file.
+        </p>
+
+        <div>
+          <label for="config-url" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Supabase URL</label>
+          <input type="text" id="config-url" placeholder="https://your-project.supabase.co" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+        </div>
+
+        <div>
+          <label for="config-key" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Anon Public Key</label>
+          <textarea id="config-key" rows="3" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6..." class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm font-mono"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
+          <button onclick="clearConfigAndReload()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition font-medium">Reset Default</button>
+          <button onclick="saveConfigAndReload()" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition font-semibold">Save & Connect</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-4 text-center text-xs text-slate-400 border-t border-slate-100 bg-white">
+    &copy; 2026 Tejal Enterprises. All rights reserved.
+  </footer>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+
+  <script>
+    // Config modal visual toggles
+    function toggleConfigModal(show) {
+      const modal = document.getElementById('config-modal');
+      const content = document.getElementById('config-modal-content');
+      
+      if (show) {
+        modal.classList.remove('hidden');
+        // Fill current credentials
+        const current = window.getSupabaseConfig();
+        document.getElementById('config-url').value = current.url || '';
+        document.getElementById('config-key').value = current.key || '';
+        
+        setTimeout(() => {
+          content.classList.remove('scale-95', 'opacity-0');
+        }, 50);
+      } else {
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+          modal.classList.add('hidden');
+        }, 300);
+      }
+    }
+
+    function saveConfigAndReload() {
+      const url = document.getElementById('config-url').value;
+      const key = document.getElementById('config-key').value;
+      if (window.saveSupabaseConfig(url, key)) {
+        location.reload();
+      } else {
+        alert("Please fill in both fields correctly!");
+      }
+    }
+
+
+    function clearConfigAndReload() {
+      window.clearSupabaseConfig();
+      location.reload();
+    }
+
+    // Process Form Login
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (!window.isSupabaseConfigured() || !window.supabaseInstance) {
+        showToast("Please configure Supabase connection first!", "error");
+        toggleConfigModal(true);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        return;
+      }
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const submitBtn = document.getElementById('submit-btn');
+
+      // Update button visual loading state
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Signing in...</span>
+      `;
+
+      try {
+        const { data, error } = await window.supabaseInstance.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        console.log('login response', { data, error });
+
+        if (error) throw error;
+
+        showToast("Signed in successfully!");
+        sessionStorage.clear(); // Clear cached profile to trigger refetch
+        
+        // Wait a small moment to let toast show, then redirect
+        setTimeout(() => {
+          checkAuthAndRedirect();
+        }, 800);
+
+      } catch (err) {
+        const message = err?.message || (typeof err === 'object' ? JSON.stringify(err, null, 2) : String(err)) || "Invalid credentials. Please try again.";
+        showToast(message, "error");
+        console.error('Login error:', err);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
+    });
+
+    // Check configuration on load to show banner warning
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.isSupabaseConfigured()) {
+        document.getElementById('config-alert').classList.remove('hidden');
+      }
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

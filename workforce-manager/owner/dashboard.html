@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- Welcome Header banner -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
+      <div>
+        <h2 class="font-extrabold text-2xl text-slate-800 tracking-tight">Management Control</h2>
+        <p class="text-xs text-slate-500 font-medium">Tejal Enterprises Workforce Overview</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="date-badge" class="bg-white px-4 py-2 border border-slate-200 text-xs font-semibold rounded-lg shadow-sm text-slate-700"></span>
+      </div>
+    </div>
+
+    <!-- Analytics Stats Cards Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      
+      <!-- Card 1: Total Workers -->
+      <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div class="space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Workers</span>
+          <p id="stat-total-workers" class="text-2xl font-extrabold text-slate-800">--</p>
+        </div>
+        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="users" class="w-5 h-5"></i></div>
+      </div>
+
+      <!-- Card 2: Active Workers -->
+      <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div class="space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Staff</span>
+          <p id="stat-active-workers" class="text-2xl font-extrabold text-slate-800">--</p>
+        </div>
+        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="user-check" class="w-5 h-5"></i></div>
+      </div>
+
+      <!-- Card 3: Total Sites -->
+      <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div class="space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Sites</span>
+          <p id="stat-total-sites" class="text-2xl font-extrabold text-slate-800">--</p>
+        </div>
+        <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="map-pin" class="w-5 h-5"></i></div>
+      </div>
+
+      <!-- Card 4: Today's Attendance -->
+      <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div class="space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today Logged</span>
+          <p id="stat-today-attendance" class="text-2xl font-extrabold text-slate-800">--</p>
+        </div>
+        <div class="p-2.5 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="calendar" class="w-5 h-5"></i></div>
+      </div>
+
+      <!-- Card 5: Today's Uploaded Photos -->
+      <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between col-span-2 lg:col-span-1">
+        <div class="space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Proof Uploads</span>
+          <p id="stat-today-uploads" class="text-2xl font-extrabold text-slate-800">--</p>
+        </div>
+        <div class="p-2.5 bg-purple-50 text-purple-600 rounded-lg"><i data-lucide="camera" class="w-5 h-5"></i></div>
+      </div>
+
+    </div>
+
+    <!-- Quick action shortcuts -->
+    <div class="space-y-3">
+      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Quick Shortcuts</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <a href="workers.html?action=new" class="interactive-card bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4 hover:border-blue-400">
+          <div class="p-3 bg-blue-50 text-blue-600 rounded-xl"><i data-lucide="user-plus" class="w-6 h-6"></i></div>
+          <div>
+            <span class="font-bold text-sm text-slate-800 block">Register Worker</span>
+            <span class="text-xs text-slate-400">Create new staff logins</span>
+          </div>
+        </a>
+
+        <a href="sites.html?action=new" class="interactive-card bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4 hover:border-emerald-400">
+          <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><i data-lucide="folder-plus" class="w-6 h-6"></i></div>
+          <div>
+            <span class="font-bold text-sm text-slate-800 block">Create Site</span>
+            <span class="text-xs text-slate-400">Add client job boundaries</span>
+          </div>
+        </a>
+
+        <a href="locations.html" class="interactive-card bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4 hover:border-purple-400">
+          <div class="p-3 bg-purple-50 text-purple-600 rounded-xl"><i data-lucide="map" class="w-6 h-6"></i></div>
+          <div>
+            <span class="font-bold text-sm text-slate-800 block">View Live Map</span>
+            <span class="text-xs text-slate-400">Monitor field staff pins</span>
+          </div>
+        </a>
+
+        <a href="photos.html" class="interactive-card bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4 hover:border-amber-400">
+          <div class="p-3 bg-amber-50 text-amber-600 rounded-xl"><i data-lucide="image" class="w-6 h-6"></i></div>
+          <div>
+            <span class="font-bold text-sm text-slate-800 block">Audit Photo Feed</span>
+            <span class="text-xs text-slate-400">Review camera uploads</span>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+    <!-- Core Layout Content: Activity Feed -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-150 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="activity" class="w-5 h-5 text-blue-600"></i>
+          <h3 class="font-bold text-sm text-slate-800">Recent Field Activities</h3>
+        </div>
+        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-medium">Real-Time</span>
+      </div>
+
+      <div id="activity-feed-container" class="space-y-4 pt-2">
+        <!-- Loader skeletons -->
+        <div class="flex gap-4 skeleton h-12 rounded-lg"></div>
+        <div class="flex gap-4 skeleton h-12 rounded-lg"></div>
+        <div class="flex gap-4 skeleton h-12 rounded-lg"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Set Top date badge
+      const options = { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' };
+      document.getElementById('date-badge').innerText = new Date().toLocaleDateString('en-US', options);
+
+      if (!window.supabaseInstance) return;
+
+      // 1. Fetch dashboard metrics via database function
+      try {
+        const { data, error } = await window.supabaseInstance.rpc('get_admin_dashboard_stats');
+        
+        if (error) throw error;
+
+        if (data) {
+          document.getElementById('stat-total-workers').innerText = data.total_workers || 0;
+          document.getElementById('stat-active-workers').innerText = data.active_workers || 0;
+          document.getElementById('stat-total-sites').innerText = data.total_sites || 0;
+          document.getElementById('stat-today-attendance').innerText = data.today_attendance || 0;
+          document.getElementById('stat-today-uploads').innerText = data.today_uploads || 0;
+        }
+      } catch (err) {
+        console.error("Error fetching admin stats:", err);
+      }
+
+      // 2. Fetch and combine activities
+      try {
+        // Fetch last 5 attendance logs
+        const { data: attendance, error: attErr } = await window.supabaseInstance
+          .from('attendance')
+          .select('*, profiles(full_name), sites(site_name)')
+          .order('check_in_time', { ascending: false })
+          .limit(5);
+
+        if (attErr) throw attErr;
+
+        // Fetch last 5 photos
+        const { data: photos, error: photoErr } = await window.supabaseInstance
+          .from('photo_uploads')
+          .select('*, profiles(full_name), sites(site_name)')
+          .order('uploaded_at', { ascending: false })
+          .limit(5);
+
+        if (photoErr) throw photoErr;
+
+        // Combine and sort by date
+        const activities = [];
+
+        if (attendance) {
+          attendance.forEach(item => {
+            activities.push({
+              type: 'attendance_in',
+              time: new Date(item.check_in_time),
+              workerName: item.profiles ? item.profiles.full_name : 'Unknown Worker',
+              siteName: item.sites ? item.sites.site_name : 'Unknown Site',
+              details: `Checked In`
+            });
+            if (item.check_out_time) {
+              activities.push({
+                type: 'attendance_out',
+                time: new Date(item.check_out_time),
+                workerName: item.profiles ? item.profiles.full_name : 'Unknown Worker',
+                siteName: item.sites ? item.sites.site_name : 'Unknown Site',
+                details: `Checked Out`
+              });
+            }
+          });
+        }
+
+        if (photos) {
+          photos.forEach(item => {
+            activities.push({
+              type: 'photo_upload',
+              time: new Date(item.uploaded_at),
+              workerName: item.profiles ? item.profiles.full_name : 'Unknown Worker',
+              siteName: item.sites ? item.sites.site_name : 'Unknown Site',
+              details: `Uploaded photo proof: "${item.caption || 'No caption'}"`
+            });
+          });
+        }
+
+        // Sort descending
+        activities.sort((a, b) => b.time - a.time);
+
+        // Display activities (limit to top 7 total)
+        const container = document.getElementById('activity-feed-container');
+        container.innerHTML = '';
+
+        const displayed = activities.slice(0, 7);
+
+        if (displayed.length > 0) {
+          displayed.forEach(act => {
+            const timeAgo = formatTimeAgo(act.time);
+            
+            // Format icon
+            let icon = 'clock';
+            let bg = 'bg-slate-100 text-slate-600';
+            
+            if (act.type === 'attendance_in') {
+              icon = 'arrow-right-circle';
+              bg = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+            } else if (act.type === 'attendance_out') {
+              icon = 'arrow-left-circle';
+              bg = 'bg-rose-50 text-rose-600 border border-rose-100';
+            } else if (act.type === 'photo_upload') {
+              icon = 'camera';
+              bg = 'bg-purple-50 text-purple-600 border border-purple-100';
+            }
+
+            const item = document.createElement('div');
+            item.className = "flex gap-4 items-start py-3 border-b border-slate-50 last:border-b-0";
+            item.innerHTML = `
+              <div class="p-2.5 ${bg} rounded-xl flex-shrink-0">
+                <i data-lucide="${icon}" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-grow space-y-0.5">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-bold text-slate-800">${act.workerName}</span>
+                  <span class="text-[10px] text-slate-400 font-semibold uppercase">${timeAgo}</span>
+                </div>
+                <p class="text-xs text-slate-500">${act.details} at <span class="font-semibold text-slate-700">${act.siteName}</span></p>
+              </div>
+            `;
+            container.appendChild(item);
+          });
+        } else {
+          container.innerHTML = `
+            <div class="p-6 text-center text-xs text-slate-400 font-medium bg-slate-50 rounded-xl">
+              No recent field activity recorded.
+            </div>
+          `;
+        }
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+      } catch (err) {
+        console.error("Error building activity feed:", err);
+      }
+    });
+
+    // Helper to calculate relative time
+    function formatTimeAgo(date) {
+      const seconds = Math.floor((new Date() - date) / 1000);
+      let interval = Math.floor(seconds / 31536000);
+      if (interval >= 1) return interval + "y ago";
+      interval = Math.floor(seconds / 2592000);
+      if (interval >= 1) return interval + "mo ago";
+      interval = Math.floor(seconds / 86400);
+      if (interval >= 1) return interval + "d ago";
+      interval = Math.floor(seconds / 3600);
+      if (interval >= 1) return interval + "h ago";
+      interval = Math.floor(seconds / 60);
+      if (interval >= 1) return interval + "m ago";
+      return "just now";
+    }
+  </script>
+</body>
+</html>

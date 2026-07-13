@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Audit | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Header -->
+    <div class="border-b border-slate-200 pb-5">
+      <h2 class="font-extrabold text-2xl text-slate-800 tracking-tight">Attendance Logs</h2>
+      <p class="text-xs text-slate-500 font-medium">Audit electrician clock-in times and verified GPS coordinates</p>
+    </div>
+
+    <!-- Filter Control Panel -->
+    <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Filter Date -->
+        <div>
+          <label for="filter-date" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Date</label>
+          <input type="date" id="filter-date" onchange="loadAttendance()" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+        </div>
+
+        <!-- Filter Worker -->
+        <div>
+          <label for="filter-worker" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Worker</label>
+          <select id="filter-worker" onchange="loadAttendance()" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm bg-white">
+            <option value="">All Workers</option>
+          </select>
+        </div>
+
+        <!-- Filter Site -->
+        <div>
+          <label for="filter-site" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Job Site</label>
+          <select id="filter-site" onchange="loadAttendance()" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm bg-white">
+            <option value="">All Sites</option>
+          </select>
+        </div>
+
+        <!-- Reset buttons -->
+        <div class="flex items-end justify-start sm:justify-end gap-3 pb-0.5">
+          <button onclick="resetFilters()" class="w-full sm:w-auto px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-semibold transition cursor-pointer">
+            Clear Filters
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Attendance Logs Grid -->
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
+          <thead class="bg-slate-50 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            <tr>
+              <th scope="col" class="px-6 py-4">Worker</th>
+              <th scope="col" class="px-6 py-4">Assigned Site</th>
+              <th scope="col" class="px-6 py-4">Check In</th>
+              <th scope="col" class="px-6 py-4">Check Out</th>
+              <th scope="col" class="px-6 py-4">Verification Location</th>
+              <th scope="col" class="px-6 py-4">Status</th>
+            </tr>
+          </thead>
+          
+          <tbody id="attendance-table-body" class="divide-y divide-slate-100">
+            <!-- Loader template -->
+            <tr>
+              <td colspan="6" class="px-6 py-10 text-center text-slate-400 font-medium">
+                <div class="flex items-center justify-center gap-2">
+                  <i data-lucide="loader-2" class="w-5 h-5 animate-spin text-blue-600"></i>
+                  <span>Retrieving attendance registry...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Set default date filter to today
+      // (Wait, we can leave date filter empty by default so it shows all logs, which is typical for audit history, or set it to empty. Let's keep it empty to show all history unless filtered).
+      
+      // 1. Fetch dropdown filters lists
+      await populateFilters();
+
+      // 2. Fetch and render attendance table
+      await loadAttendance();
+    });
+
+    async function populateFilters() {
+      if (!window.supabaseInstance) return;
+
+      try {
+        // Fetch active/inactive workers
+        const { data: workers } = await window.supabaseInstance
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'worker')
+          .order('full_name', { ascending: true });
+
+        const workerSelect = document.getElementById('filter-worker');
+        if (workers) {
+          workers.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id;
+            opt.innerText = w.full_name;
+            workerSelect.appendChild(opt);
+          });
+        }
+
+        // Fetch sites
+        const { data: sites } = await window.supabaseInstance
+          .from('sites')
+          .select('id, site_name')
+          .order('site_name', { ascending: true });
+
+        const siteSelect = document.getElementById('filter-site');
+        if (sites) {
+          sites.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.innerText = s.site_name;
+            siteSelect.appendChild(opt);
+          });
+        }
+      } catch (err) {
+        console.error("Error populating dropdown filters:", err);
+      }
+    }
+
+    async function loadAttendance() {
+      if (!window.supabaseInstance) return;
+
+      const tbody = document.getElementById('attendance-table-body');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="px-6 py-10 text-center text-slate-400 font-medium">
+            <div class="flex items-center justify-center gap-2">
+              <i data-lucide="loader-2" class="w-5 h-5 animate-spin text-blue-600"></i>
+              <span>Filtering records...</span>
+            </div>
+          </td>
+        </tr>
+      `;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+
+      const dateVal = document.getElementById('filter-date').value;
+      const workerVal = document.getElementById('filter-worker').value;
+      const siteVal = document.getElementById('filter-site').value;
+
+      try {
+        // Build base query
+        let query = window.supabaseInstance
+          .from('attendance')
+          .select('*, profiles(full_name, email), sites(site_name)')
+          .order('attendance_date', { ascending: false })
+          .order('check_in_time', { ascending: false });
+
+        // Apply filters conditionally
+        if (dateVal) {
+          query = query.eq('attendance_date', dateVal);
+        }
+        if (workerVal) {
+          query = query.eq('worker_id', workerVal);
+        }
+        if (siteVal) {
+          query = query.eq('site_id', siteVal);
+        }
+
+        const { data: logs, error } = await query;
+        if (error) throw error;
+
+        tbody.innerHTML = '';
+
+        if (logs && logs.length > 0) {
+          logs.forEach(log => {
+            const workerName = log.profiles ? log.profiles.full_name : 'Unknown Worker';
+            const workerEmail = log.profiles ? log.profiles.email : 'Unknown email';
+            const siteName = log.sites ? log.sites.site_name : 'Unknown Site';
+            
+            const dateObj = new Date(log.attendance_date + 'T00:00:00');
+            const dateFmt = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            
+            const checkIn = new Date(log.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const checkOut = log.check_out_time ? new Date(log.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+
+            // Location Link formatting
+            let locationCell = '<span class="text-slate-400 text-xs">No Coordinates</span>';
+            if (log.latitude && log.longitude) {
+              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${log.latitude},${log.longitude}`;
+              locationCell = `
+                <a href="${mapsUrl}" target="_blank" class="inline-flex items-center gap-1 hover:underline text-blue-600 bg-blue-50 border border-blue-100 font-semibold text-xs px-2.5 py-1 rounded-md transition" title="Show coordinates on external map">
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5 text-blue-600"></i> Open Maps
+                </a>
+              `;
+            }
+
+            let statusStyle = 'bg-slate-100 text-slate-600 border border-slate-200';
+            if (!log.check_out_time) {
+              statusStyle = 'bg-emerald-50 border border-emerald-100 text-emerald-700 font-bold';
+            }
+
+            tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/50 transition";
+            tr.innerHTML = `
+              <td class="px-6 py-4.5 whitespace-nowrap">
+                <div>
+                  <span class="font-bold text-slate-800 text-sm block leading-snug">${workerName}</span>
+                  <span class="text-xs text-slate-400 font-medium">${workerEmail}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4.5 whitespace-nowrap">
+                <span class="text-sm font-semibold text-slate-800">${siteName}</span>
+              </td>
+              <td class="px-6 py-4.5 whitespace-nowrap">
+                <div>
+                  <span class="font-bold text-slate-800 text-sm block leading-snug">${checkIn}</span>
+                  <span class="text-[10px] text-slate-400 font-bold uppercase">${dateFmt}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4.5 whitespace-nowrap">
+                <span class="text-sm font-bold text-slate-700">${checkOut}</span>
+              </td>
+              <td class="px-6 py-4.5 whitespace-nowrap">
+                ${locationCell}
+              </td>
+              <td class="px-6 py-4.5 whitespace-nowrap">
+                <span class="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${statusStyle}">
+                  ${log.check_out_time ? 'Finished' : 'On Clock'}
+                </span>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="px-6 py-12 text-center text-slate-400 font-medium">
+                No attendance logs found matching the filters.
+              </td>
+            </tr>
+          `;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      } catch (err) {
+        showToast(err.message || "Failed to query attendance.", "error");
+      }
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-date').value = '';
+      document.getElementById('filter-worker').value = '';
+      document.getElementById('filter-site').value = '';
+      loadAttendance();
+    }
+  </script>
+</body>
+</html>

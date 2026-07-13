@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Workers | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Header & Action Panel -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
+      <div>
+        <h2 class="font-extrabold text-2xl text-slate-800 tracking-tight">Worker Management</h2>
+        <p class="text-xs text-slate-500 font-medium">Create, edit, and toggle field electrician credentials</p>
+      </div>
+      <button onclick="openWorkerModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg shadow-sm flex items-center justify-center gap-2 text-sm transition cursor-pointer">
+        <i data-lucide="user-plus" class="w-4 h-4"></i> Add Worker
+      </button>
+    </div>
+
+    <!-- Filters & Search Bar -->
+    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div class="relative w-full md:max-w-sm">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </span>
+        <input type="text" id="search-input" onkeyup="filterWorkersTable()" placeholder="Search worker by name, phone, or email..." class="w-full pl-9 pr-4 py-2 border border-slate-200 focus:outline-none focus:border-blue-600 rounded-lg text-sm transition" />
+      </div>
+      
+      <div class="flex items-center gap-2 self-end md:self-auto text-xs text-slate-400 font-medium">
+        <span>Showing:</span>
+        <span id="showing-count" class="font-bold text-slate-800">0</span>
+        <span>workers</span>
+      </div>
+    </div>
+
+    <!-- Workers Table Grid Container -->
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
+          <thead class="bg-slate-50 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            <tr>
+              <th scope="col" class="px-6 py-4">Name</th>
+              <th scope="col" class="px-6 py-4">Contact</th>
+              <th scope="col" class="px-6 py-4">Assigned Site</th>
+              <th scope="col" class="px-6 py-4">Status</th>
+              <th scope="col" class="px-6 py-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          
+          <tbody id="workers-table-body" class="divide-y divide-slate-100">
+            <!-- Loading state -->
+            <tr>
+              <td colspan="5" class="px-6 py-10 text-center text-slate-400 font-medium">
+                <div class="flex items-center justify-center gap-2">
+                  <i data-lucide="loader-2" class="w-5 h-5 animate-spin text-blue-600"></i>
+                  <span>Retrieving worker database...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Add / Edit Worker Drawer Modal -->
+  <div id="worker-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="worker-modal-content">
+      
+      <!-- Modal Header -->
+      <div class="bg-slate-900 text-white px-6 py-5 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i id="modal-icon" data-lucide="user-plus" class="w-5 h-5 text-blue-400"></i>
+          <h2 id="modal-title" class="font-bold text-lg">Add Worker Account</h2>
+        </div>
+        <button onclick="closeWorkerModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form -->
+      <form id="worker-form">
+        <input type="hidden" id="edit-worker-id" />
+        
+        <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2">
+              <label for="worker-name" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Full Name</label>
+              <input type="text" id="worker-name" required placeholder="e.g. John Doe" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div>
+              <label for="worker-phone" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Phone Number</label>
+              <input type="tel" id="worker-phone" placeholder="e.g. +1 555-0199" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div>
+              <label for="worker-joining" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Joining Date</label>
+              <input type="date" id="worker-joining" required class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-4 space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Security Credentials</h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div class="col-span-2">
+                <label for="worker-email" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Email Address</label>
+                <input type="email" id="worker-email" required placeholder="e.g. john@electrician.com" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+              </div>
+
+              <div class="col-span-2">
+                <label for="worker-password" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5" id="lbl-password">Login Password</label>
+                <input type="password" id="worker-password" required placeholder="Min 6 characters" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+                <p id="password-helper" class="hidden text-[10px] text-slate-400 mt-1">Leave password blank if you do not want to change it.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-4">
+            <label for="worker-address" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Home Address</label>
+            <textarea id="worker-address" rows="2" placeholder="e.g. 582 Broad St, New Jersey" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm"></textarea>
+          </div>
+
+        </div>
+
+        <!-- Submit buttons -->
+        <div class="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+          <button type="button" onclick="closeWorkerModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition font-medium">Cancel</button>
+          <button type="submit" id="btn-save-worker" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition font-semibold">Save Worker</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    let workersList = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Fetch Workers database
+      await loadWorkers();
+      
+      // Check for URL parameters (?action=new) to open modal
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('action') === 'new') {
+        openWorkerModal();
+      }
+    });
+
+    async function loadWorkers() {
+      if (!window.supabaseInstance) return;
+
+      try {
+        // Fetch all workers joined with assignments and site details
+        const { data, error } = await window.supabaseInstance
+          .from('profiles')
+          .select('*, worker_assignments!worker_id(id, sites(site_name))')
+          .eq('role', 'worker')
+          .order('full_name', { ascending: true });
+
+        if (error) throw error;
+        workersList = data || [];
+        renderWorkersTable(workersList);
+
+      } catch (err) {
+        showToast(err.message || "Failed to load workers.", "error");
+      }
+    }
+
+    function renderWorkersTable(list) {
+      const tbody = document.getElementById('workers-table-body');
+      tbody.innerHTML = '';
+      
+      document.getElementById('showing-count').innerText = list.length;
+
+      if (list.length > 0) {
+        list.forEach(worker => {
+          // Map assigned sites
+          const assignedSite = worker.worker_assignments?.[0]?.sites?.site_name || 'Unassigned';
+          const isAssigned = assignedSite !== 'Unassigned';
+          
+          const statusActive = worker.status === 'active';
+
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-50/50 transition";
+          tr.innerHTML = `
+            <td class="px-6 py-4.5 whitespace-nowrap">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-sm">
+                  ${worker.full_name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+                <div>
+                  <span class="font-bold text-slate-800 block">${worker.full_name}</span>
+                  <span class="text-xs text-slate-400 font-medium">${worker.email}</span>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4.5 whitespace-nowrap">
+              <span class="text-slate-600 font-medium">${worker.phone || '--'}</span>
+            </td>
+            <td class="px-6 py-4.5 whitespace-nowrap">
+              <span class="text-sm font-semibold ${isAssigned ? 'text-slate-800' : 'text-slate-400'}">
+                ${assignedSite}
+              </span>
+            </td>
+            <td class="px-6 py-4.5 whitespace-nowrap">
+              <button onclick="toggleWorkerStatus('${worker.id}', '${worker.status}')" class="flex items-center gap-2 group focus:outline-none cursor-pointer">
+                <span class="inline-block w-2.5 h-2.5 rounded-full ${statusActive ? 'bg-emerald-500 shadow-sm shadow-emerald-200' : 'bg-slate-400'}"></span>
+                <span class="text-xs font-semibold ${statusActive ? 'text-emerald-700 group-hover:text-emerald-800' : 'text-slate-500 group-hover:text-slate-700'} underline decoration-dotted">
+                  ${worker.status.toUpperCase()}
+                </span>
+              </button>
+            </td>
+            <td class="px-6 py-4.5 whitespace-nowrap text-right text-sm font-medium">
+              <div class="flex items-center justify-end gap-3">
+                <button onclick="openWorkerModal('${worker.id}')" class="text-blue-600 hover:text-blue-900 bg-blue-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1 cursor-pointer">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-10 text-center text-slate-400 font-medium">
+              No worker accounts registered. Click "Add Worker" to begin.
+            </td>
+          </tr>
+        `;
+      }
+      
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function filterWorkersTable() {
+      const val = document.getElementById('search-input').value.toLowerCase().trim();
+      const filtered = workersList.filter(w => 
+        w.full_name.toLowerCase().includes(val) ||
+        (w.email && w.email.toLowerCase().includes(val)) ||
+        (w.phone && w.phone.includes(val))
+      );
+      renderWorkersTable(filtered);
+    }
+
+    // Modal triggers
+    function openWorkerModal(workerId = '') {
+      const modal = document.getElementById('worker-modal');
+      const content = document.getElementById('worker-modal-content');
+      
+      modal.classList.remove('hidden');
+      setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 50);
+
+      const title = document.getElementById('modal-title');
+      const icon = document.getElementById('modal-icon');
+      const pField = document.getElementById('worker-password');
+      const helper = document.getElementById('password-helper');
+      
+      // Default reset
+      document.getElementById('worker-form').reset();
+      document.getElementById('edit-worker-id').value = '';
+      
+      if (workerId) {
+        // Edit Mode
+        const worker = workersList.find(w => w.id === workerId);
+        if (!worker) return;
+
+        title.innerText = "Edit Worker Account";
+        icon.setAttribute('data-lucide', 'user-cog');
+        
+        document.getElementById('edit-worker-id').value = worker.id;
+        document.getElementById('worker-name').value = worker.full_name;
+        document.getElementById('worker-phone').value = worker.phone || '';
+        document.getElementById('worker-email').value = worker.email || '';
+        document.getElementById('worker-joining').value = worker.joining_date || '';
+        document.getElementById('worker-address').value = worker.address || '';
+        
+        pField.required = false;
+        pField.placeholder = "••••••••";
+        helper.classList.remove('hidden');
+      } else {
+        // Add Mode
+        title.innerText = "Add Worker Account";
+        icon.setAttribute('data-lucide', 'user-plus');
+        
+        pField.required = true;
+        pField.placeholder = "Min 6 characters";
+        helper.classList.add('hidden');
+        document.getElementById('worker-joining').value = new Date().toISOString().split('T')[0];
+      }
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeWorkerModal() {
+      const modal = document.getElementById('worker-modal');
+      const content = document.getElementById('worker-modal-content');
+      
+      content.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    // Toggle status (Active / Inactive) via RPC
+    async function toggleWorkerStatus(id, currentStatus) {
+      if (!window.supabaseInstance) return;
+
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      const confirmMsg = `Are you sure you want to make this worker account ${newStatus.toUpperCase()}? (Bans or restores user login)`;
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        const { error } = await window.supabaseInstance.rpc('toggle_worker_status', {
+          worker_profile_id: id,
+          status_param: newStatus
+        });
+
+        if (error) throw error;
+        
+        showToast(`Worker status updated to ${newStatus.toUpperCase()}`);
+        await loadWorkers();
+      } catch (err) {
+        showToast(err.message || "Failed to toggle status.", "error");
+      }
+    }
+
+    // Submit Worker Form (Add or Edit) via RPCs
+    document.getElementById('worker-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!window.supabaseInstance) return;
+
+      const btn = document.getElementById('btn-save-worker');
+      const id = document.getElementById('edit-worker-id').value;
+      
+      const name = document.getElementById('worker-name').value.trim();
+      const phone = document.getElementById('worker-phone').value.trim();
+      const email = document.getElementById('worker-email').value.trim();
+      const joining = document.getElementById('worker-joining').value;
+      const address = document.getElementById('worker-address').value.trim();
+      const password = document.getElementById('worker-password').value;
+
+      btn.disabled = true;
+      btn.innerText = "Processing...";
+
+      try {
+        if (id) {
+          // Edit worker
+          const { error } = await window.supabaseInstance.rpc('update_worker_user', {
+            worker_profile_id: id,
+            email_param: email,
+            password_param: password || null,
+            full_name_param: name,
+            phone_param: phone || null,
+            address_param: address || null,
+            joining_date_param: joining
+          });
+
+          if (error) throw error;
+          showToast("Worker details modified successfully!");
+        } else {
+          // Create worker
+          if (password.length < 6) {
+            throw new Error("Password must be at least 6 characters.");
+          }
+          
+          const { data, error } = await window.supabaseInstance.rpc('create_worker_user', {
+            email_param: email,
+            password_param: password,
+            full_name_param: name,
+            phone_param: phone || null,
+            address_param: address || null,
+            joining_date_param: joining
+          });
+
+          if (error) throw error;
+          showToast("Worker registered successfully!");
+        }
+
+        closeWorkerModal();
+        await loadWorkers();
+      } catch (err) {
+        showToast(err.message || "Operation failed. Check inputs.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Save Worker";
+      }
+    });
+  </script>
+</body>
+</html>

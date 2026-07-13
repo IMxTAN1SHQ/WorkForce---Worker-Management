@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Work Proof | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Inline Tailwind config removed
+  </script>
+  <script src="assets/js/tailwind-config.js"></script>
+  </script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-md mx-auto px-4 py-6 space-y-6">
+
+    <!-- Header navigation back link -->
+    <div class="flex items-center gap-2">
+      <a href="dashboard.html" class="p-2 hover:bg-slate-200 rounded-lg text-slate-600 transition">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+      </a>
+      <h2 class="font-bold text-lg text-slate-800">Upload Work Proof</h2>
+    </div>
+
+    <!-- Active Site Banner Info -->
+    <div class="bg-slate-900 text-white rounded-xl p-4 flex items-center gap-3">
+      <div class="bg-blue-600 p-2 rounded-lg text-white">
+        <i data-lucide="map-pin" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Uploading to Site</p>
+        <p id="upload-site-name" class="font-bold text-sm">Checking assignments...</p>
+      </div>
+    </div>
+
+    <!-- Main Form -->
+    <form id="upload-form" class="space-y-5">
+      
+      <!-- Camera Touch Target Container -->
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">Photo Proof</label>
+        
+        <!-- Hiding default file selector, utilizing custom UI -->
+        <input type="file" id="camera-input" accept="image/*" capture="environment" required class="hidden" />
+        
+        <div id="camera-dropzone" onclick="triggerCamera()" class="border-2 border-dashed border-slate-300 hover:border-blue-400 bg-white rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition relative overflow-hidden h-64">
+          
+          <!-- State A: Empty state -->
+          <div id="dropzone-empty" class="space-y-2.5 flex flex-col items-center">
+            <div class="p-4 bg-slate-50 text-slate-400 rounded-full border border-slate-100 group-hover:scale-105 transition duration-300">
+              <i data-lucide="camera" class="w-8 h-8 text-slate-500"></i>
+            </div>
+            <div>
+              <span class="font-bold text-sm text-slate-700 block">Take On-Site Photo</span>
+              <span class="text-xs text-slate-400 mt-1 block">Tap to open native camera</span>
+            </div>
+          </div>
+
+          <!-- State B: Image Selected State -->
+          <div id="dropzone-preview" class="hidden absolute inset-0 w-full h-full bg-slate-150 flex items-center justify-center">
+            <img id="image-preview" src="#" alt="Selected on-site proof" class="w-full h-full object-cover" />
+            
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-white text-xs font-semibold cursor-pointer border border-white/10 hover:bg-slate-950 transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Change Photo
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Caption Input -->
+      <div>
+        <label for="caption" class="block text-sm font-semibold text-slate-700 mb-1.5">Caption / Description</label>
+        <textarea id="caption" rows="2" placeholder="Describe the completed work (e.g., Main switches installed...)" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-600 text-sm transition placeholder-slate-400 focus:ring-2 focus:ring-blue-100"></textarea>
+      </div>
+
+      <!-- Upload Button -->
+      <button type="submit" id="btn-submit-upload" disabled class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-3 rounded-lg shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed">
+        <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+        <span id="btn-submit-text">Verify GPS & Upload</span>
+      </button>
+
+    </form>
+
+  </main>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    let activeSite = null;
+    let selectedImageFile = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const cachedSite = sessionStorage.getItem('assigned_site');
+      if (cachedSite) {
+        activeSite = JSON.parse(cachedSite);
+        document.getElementById('upload-site-name').innerText = activeSite.site_name;
+        document.getElementById('btn-submit-upload').disabled = false;
+      } else {
+        document.getElementById('upload-site-name').innerText = "No Assigned Site";
+        document.getElementById('upload-site-name').className = "font-bold text-sm text-rose-400";
+        showToast("You must have an assigned site before uploading photos.", "error");
+      }
+
+      // Hook file selection change
+      document.getElementById('camera-input').addEventListener('change', handleFileSelected);
+    });
+
+    function triggerCamera() {
+      if (!activeSite) {
+        showToast("Cannot upload photo without site assignment.", "error");
+        return;
+      }
+      document.getElementById('camera-input').click();
+    }
+
+    function handleFileSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      selectedImageFile = file;
+
+      // Show preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        document.getElementById('image-preview').src = e.target.result;
+        document.getElementById('dropzone-empty').classList.add('hidden');
+        document.getElementById('dropzone-preview').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Compress Image using canvas
+    function compressImage(file, maxWidth = 1024, maxHeight = 1024) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+              resolve(blob);
+            }, 'image/jpeg', 0.85); // Compress to high-quality JPEG (85%)
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Process upload form submission
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!activeSite) return;
+      if (!selectedImageFile) {
+        showToast("Please capture or select a photo first!", "error");
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit-upload');
+      const btnText = document.getElementById('btn-submit-text');
+      const profile = JSON.parse(sessionStorage.getItem('user_profile'));
+
+      if (!profile || !window.supabaseInstance) return;
+
+      // Disable button and show loading state
+      btn.disabled = true;
+      btnText.innerText = "Acquiring GPS...";
+      
+      let coords = null;
+      try {
+        coords = await getCurrentLocation();
+      } catch (err) {
+        showToast("Failed to verify location. Geolocation is required for work proof uploads.", "error");
+        btn.disabled = false;
+        btnText.innerText = "Verify GPS & Upload";
+        return;
+      }
+
+      btnText.innerText = "Compressing Image...";
+
+      try {
+        // 1. Compress file
+        const compressedBlob = await compressImage(selectedImageFile);
+
+        btnText.innerText = "Uploading to Storage...";
+        
+        // 2. Upload file to Supabase storage bucket
+        const fileExt = 'jpg';
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const filePath = `site-photos/${profile.id}/${activeSite.id}/${fileName}`;
+
+        const { data: uploadData, error: storageError } = await window.supabaseInstance.storage
+          .from('site-photos')
+          .upload(filePath, compressedBlob, {
+            contentType: 'image/jpeg',
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (storageError) throw storageError;
+
+        // 3. Retrieve public URL
+        const { data: { publicUrl } } = window.supabaseInstance.storage
+          .from('site-photos')
+          .getPublicUrl(filePath);
+
+        btnText.innerText = "Saving Metadata...";
+
+        // 4. Save metadata to db
+        const captionText = document.getElementById('caption').value.trim();
+        const { error: dbError } = await window.supabaseInstance
+          .from('photo_uploads')
+          .insert({
+            worker_id: profile.id,
+            site_id: activeSite.id,
+            image_url: publicUrl,
+            caption: captionText || null,
+            latitude: coords.latitude,
+            longitude: coords.longitude
+          });
+
+        if (dbError) throw dbError;
+
+        // 5. Also log location log entry
+        await window.supabaseInstance
+          .from('location_logs')
+          .insert({
+            worker_id: profile.id,
+            site_id: activeSite.id,
+            latitude: coords.latitude,
+            longitude: coords.longitude
+          });
+
+        showToast("Photo uploaded successfully!");
+        
+        setTimeout(() => {
+          window.location.href = 'dashboard.html';
+        }, 1200);
+
+      } catch (err) {
+        showToast(err.message || "Upload failed. Try again.", "error");
+        btn.disabled = false;
+        btnText.innerText = "Verify GPS & Upload";
+      }
+    });
+  </script>
+</body>
+</html>

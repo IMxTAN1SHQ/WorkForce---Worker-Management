@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Location Map | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Leaflet Map CSS/JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+
+  <!-- Main Split Pane Layout -->
+  <main class="flex-grow flex flex-col md:flex-row overflow-hidden relative">
+
+    <!-- Left Sidebar: Worker directory -->
+    <section class="w-full md:w-80 bg-white border-r border-slate-200 flex flex-col h-72 md:h-auto overflow-hidden">
+      <!-- Sidebar Header -->
+      <div class="p-4 border-b border-slate-100 bg-slate-900 text-white flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <i data-lucide="navigation" class="w-4 h-4 text-blue-400 animate-pulse"></i>
+          <h2 class="font-bold text-sm uppercase tracking-wider">Field Directory</h2>
+        </div>
+        <button onclick="fetchLocationsAndDraw()" class="text-slate-400 hover:text-white p-1 rounded transition" title="Refresh Live Data">
+          <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
+        </button>
+      </div>
+
+      <!-- Workers List -->
+      <div id="worker-sidebar-list" class="flex-grow overflow-y-auto divide-y divide-slate-50 p-2 space-y-1">
+        <!-- Loader Skeletons -->
+        <div class="p-3 skeleton h-12 rounded-lg"></div>
+        <div class="p-3 skeleton h-12 rounded-lg"></div>
+      </div>
+      
+      <!-- Legend Footer -->
+      <div class="p-4 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-500 font-semibold uppercase tracking-wider flex items-center justify-around">
+        <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-600"></span> Electrician</span>
+        <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded bg-emerald-600"></span> Job Site</span>
+      </div>
+    </section>
+
+    <!-- Right Side: The Map Area -->
+    <section class="flex-grow relative h-[50vh] md:h-auto">
+      <div id="map" class="absolute inset-0 w-full h-full rounded-none border-none shadow-none"></div>
+    </section>
+
+  </main>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    let map = null;
+    let markersGroup = [];
+    let workersMapData = [];
+    let sitesMapData = [];
+    let workerPinsMap = {};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Initialize empty Leaflet map centering around USA/Global default
+      map = L.map('map', { zoomControl: false }).setView([39.8283, -98.5795], 4);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(map);
+
+      // Re-position zoom buttons
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      // 2. Query data and draw pins
+      await fetchLocationsAndDraw();
+    });
+
+    async function fetchLocationsAndDraw() {
+      if (!window.supabaseInstance) return;
+
+      const refreshIcon = document.getElementById('refresh-icon');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+      // Clear existing pins
+      markersGroup.forEach(m => map.removeLayer(m));
+      markersGroup = [];
+      workerPinsMap = {};
+
+      try {
+        // Fetch active sites
+        const { data: sites, error: siteError } = await window.supabaseInstance
+          .from('sites')
+          .select('*')
+          .eq('status', 'active');
+        if (siteError) throw siteError;
+        sitesMapData = sites || [];
+
+        // Fetch location logs
+        const { data: logs, error: logError } = await window.supabaseInstance
+          .from('location_logs')
+          .select('*, profiles(id, full_name, email, status, phone), sites(site_name)')
+          .order('recorded_at', { ascending: false });
+        if (logError) throw logError;
+
+        // Fetch latest photo uploads to display in popups
+        const { data: photos } = await window.supabaseInstance
+          .from('photo_uploads')
+          .select('*')
+          .order('uploaded_at', { ascending: false });
+
+        // Deduplicate photo uploads per worker
+        const latestPhotosByWorker = {};
+        if (photos) {
+          photos.forEach(p => {
+            if (!latestPhotosByWorker[p.worker_id]) {
+              latestPhotosByWorker[p.worker_id] = p;
+            }
+          });
+        }
+
+        // Deduplicate location logs per worker to get latest location
+        const latestLogsByWorker = {};
+        if (logs) {
+          logs.forEach(log => {
+            if (log.profiles && log.profiles.status === 'active') {
+              if (!latestLogsByWorker[log.worker_id]) {
+                latestLogsByWorker[log.worker_id] = {
+                  ...log,
+                  latestPhoto: latestPhotosByWorker[log.worker_id] || null
+                };
+              }
+            }
+          });
+        }
+
+        workersMapData = Object.values(latestLogsByWorker);
+        
+        // Render List and Map Markers
+        renderSidebarList(workersMapData);
+        drawMarkers();
+
+      } catch (err) {
+        showToast(err.message || "Failed to sync locations map.", "error");
+      } finally {
+        if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+      }
+    }
+
+    function renderSidebarList(workersList) {
+      const container = document.getElementById('worker-sidebar-list');
+      container.innerHTML = '';
+
+      if (workersList.length > 0) {
+        workersList.forEach(w => {
+          const hoursAgo = (new Date() - new Date(w.recorded_at)) / 1000 / 3600;
+          const statusActive = hoursAgo < 8; // Green if updated in last 8 hours
+
+          const item = document.createElement('button');
+          item.onclick = () => focusOnWorker(w.worker_id);
+          item.className = "w-full text-left p-3 hover:bg-slate-50 flex items-center justify-between rounded-lg transition border border-transparent hover:border-slate-100";
+          item.innerHTML = `
+            <div class="flex items-center gap-2.5 overflow-hidden">
+              <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-xs flex-shrink-0">
+                ${w.profiles.full_name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <div class="overflow-hidden">
+                <span class="font-bold text-xs text-slate-800 block truncate leading-snug">${w.profiles.full_name}</span>
+                <span class="text-[10px] text-slate-400 font-medium block truncate">${w.sites ? w.sites.site_name : 'No site'}</span>
+              </div>
+            </div>
+            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${statusActive ? 'bg-emerald-500 shadow-sm shadow-emerald-200' : 'bg-slate-300'}"></span>
+          `;
+          container.appendChild(item);
+        });
+      } else {
+        container.innerHTML = `
+          <div class="p-6 text-center text-xs text-slate-400 font-medium bg-slate-50 rounded-lg m-2">
+            No worker locations logged yet.
+          </div>
+        `;
+      }
+    }
+
+    function drawMarkers() {
+      const bounds = [];
+
+      // 1. Draw Active Site Pins
+      sitesMapData.forEach(site => {
+        if (site.latitude && site.longitude) {
+          const siteIcon = L.divIcon({
+            className: 'gps-pulse-site',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          });
+
+          const m = L.marker([site.latitude, site.longitude], { icon: siteIcon })
+            .addTo(map)
+            .bindPopup(`
+              <div class="p-2 space-y-1 font-sans text-xs">
+                <span class="text-[10px] font-bold text-slate-400 uppercase">JOB SITE</span>
+                <h4 class="font-bold text-slate-800 leading-tight">${site.site_name}</h4>
+                <p class="text-slate-500">${site.address || 'No address'}</p>
+                <span class="inline-block bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-semibold">${site.site_code}</span>
+              </div>
+            `);
+          markersGroup.push(m);
+          bounds.push([site.latitude, site.longitude]);
+        }
+      });
+
+      // 2. Draw Worker Pins
+      workersMapData.forEach(w => {
+        if (w.latitude && w.longitude) {
+          const workerIcon = L.divIcon({
+            className: 'gps-pulse-pin',
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+          });
+
+          const localTime = new Date(w.recorded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const localDate = new Date(w.recorded_at).toLocaleDateString([], { month: 'short', day: 'numeric' });
+          
+          let photoHtml = '';
+          if (w.latestPhoto && w.latestPhoto.image_url) {
+            photoHtml = `
+              <div class="mt-2.5 border border-slate-100 rounded-md overflow-hidden bg-slate-50">
+                <img src="${w.latestPhoto.image_url}" alt="Latest proof" class="w-full h-24 object-cover" />
+                <div class="p-1 px-2 text-[9px] text-slate-500 leading-tight truncate">"${w.latestPhoto.caption || 'Photo proof'}"</div>
+              </div>
+            `;
+          }
+
+          const m = L.marker([w.latitude, w.longitude], { icon: workerIcon })
+            .addTo(map)
+            .bindPopup(`
+              <div class="p-2 space-y-1 font-sans text-xs max-w-[180px]">
+                <span class="text-[10px] font-bold text-blue-600 uppercase">ON SITE</span>
+                <h4 class="font-extrabold text-slate-800 leading-tight">${w.profiles.full_name}</h4>
+                <p class="text-slate-500 text-[10px] leading-relaxed">Assigned: <b>${w.sites ? w.sites.site_name : 'Unassigned'}</b></p>
+                <div class="text-[10px] text-slate-400 font-medium pt-0.5">Updated: ${localDate} at ${localTime}</div>
+                ${photoHtml}
+              </div>
+            `);
+
+          markersGroup.push(m);
+          workerPinsMap[w.worker_id] = m;
+          bounds.push([w.latitude, w.longitude]);
+        }
+      });
+
+      // Fit map view bounds
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }
+
+    function focusOnWorker(workerId) {
+      const pin = workerPinsMap[workerId];
+      if (pin) {
+        map.setView(pin.getLatLng(), 16);
+        pin.openPopup();
+      } else {
+        showToast("Worker location pin not available.", "warning");
+      }
+    }
+  </script>
+</body>
+</html>

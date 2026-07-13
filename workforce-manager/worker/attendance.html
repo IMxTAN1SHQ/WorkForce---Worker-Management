@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Register | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Leaflet Map CSS/JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-md mx-auto px-4 py-6 space-y-6">
+
+    <!-- Header navigation back link -->
+    <div class="flex items-center gap-2">
+      <a href="dashboard.html" class="p-2 hover:bg-slate-200 rounded-lg text-slate-600 transition">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+      </a>
+      <h2 class="font-bold text-lg text-slate-800">Time Card Register</h2>
+    </div>
+
+    <!-- Map Preview Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div class="px-4 py-3 bg-slate-900 text-white flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <i data-lucide="map" class="w-4 h-4 text-blue-400"></i>
+          <span class="text-xs font-semibold uppercase tracking-wider">GPS Verification</span>
+        </div>
+        <span id="gps-accuracy-badge" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md border border-slate-700">Acquiring Geolocation...</span>
+      </div>
+      
+      <!-- Leaflet map container -->
+      <div id="map" class="h-44 w-full rounded-none border-none"></div>
+    </div>
+
+    <!-- Big Register Button Panel -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col items-center justify-center text-center space-y-5">
+      <div id="site-display-info" class="space-y-1">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Site</span>
+        <h3 id="btn-site-name" class="font-extrabold text-sm text-slate-800">Checking assignments...</h3>
+      </div>
+
+      <!-- Action Button -->
+      <button id="btn-register-action" disabled class="w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 bg-slate-100 text-slate-400 shadow-md font-bold text-base transition border border-slate-200 relative group cursor-not-allowed">
+        <div id="btn-pulse-effect" class="absolute inset-0 rounded-full bg-blue-100 scale-100 opacity-0 transition-all duration-700"></div>
+        <div class="relative z-10 flex flex-col items-center justify-center gap-1">
+          <i id="btn-icon" data-lucide="circle-dashed" class="w-10 h-10 animate-spin"></i>
+          <span id="btn-label">Locating...</span>
+        </div>
+      </button>
+
+      <p id="attendance-status-hint" class="text-xs text-slate-500 max-w-xs leading-relaxed">
+        Please stand within the job site boundary and ensure location settings are active.
+      </p>
+    </div>
+
+    <!-- Recent Attendance Log -->
+    <div class="space-y-3">
+      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Recent Logs</h3>
+      <div id="attendance-history-list" class="space-y-2.5">
+        <!-- Skeleton loaders -->
+        <div class="bg-white p-4 rounded-xl border border-slate-100 skeleton h-16"></div>
+        <div class="bg-white p-4 rounded-xl border border-slate-100 skeleton h-16"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    let map = null;
+    let marker = null;
+    let currentCoords = null;
+    let activeSite = null;
+    let todayRecord = null;
+
+    // Initialize Page
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Get assigned site details from cache or query
+      const profile = JSON.parse(sessionStorage.getItem('user_profile'));
+      const cachedSite = sessionStorage.getItem('assigned_site');
+      
+      if (cachedSite) {
+        activeSite = JSON.parse(cachedSite);
+        document.getElementById('btn-site-name').innerText = activeSite.site_name;
+      } else {
+        document.getElementById('btn-site-name').innerText = "No Assigned Site";
+        document.getElementById('attendance-status-hint').innerText = "You cannot record attendance unless an administrator assigns you to a job site.";
+      }
+
+      // 2. Fetch today's register state & past logs
+      await refreshRegisterState();
+
+      // 3. Initiate Leaflet & Geolocation
+      try {
+        const coords = await getCurrentLocation();
+        currentCoords = coords;
+        
+        document.getElementById('gps-accuracy-badge').innerText = `Accuracy: ±${Math.round(coords.accuracy)}m`;
+        document.getElementById('gps-accuracy-badge').className = "text-[10px] bg-blue-900 border border-blue-700 text-blue-200 px-2 py-0.5 rounded-md font-semibold";
+
+        // Draw Map
+        map = L.map('map', { zoomControl: false }).setView([coords.latitude, coords.longitude], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19
+        }).addTo(map);
+
+        // Custom Blue Pulsing Marker for Worker Location
+        const workerIcon = L.divIcon({
+          className: 'gps-pulse-pin',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+
+        marker = L.marker([coords.latitude, coords.longitude], { icon: workerIcon }).addTo(map);
+
+        // If site coordinates exist, center map between worker and site, and draw site marker
+        if (activeSite && activeSite.latitude && activeSite.longitude) {
+          const siteIcon = L.divIcon({
+            className: 'gps-pulse-site',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          });
+          L.marker([activeSite.latitude, activeSite.longitude], { icon: siteIcon })
+            .addTo(map)
+            .bindPopup(`<b>${activeSite.site_name}</b><br>Job Site Target`);
+            
+          // Bounds to fit both
+          const bounds = L.latLngBounds([
+            [coords.latitude, coords.longitude],
+            [activeSite.latitude, activeSite.longitude]
+          ]);
+          map.fitBounds(bounds, { padding: [25, 25] });
+        }
+
+        // Enable Action Button since location acquired
+        enableActionBtn();
+      } catch (err) {
+        showToast(err.message, "error");
+        document.getElementById('gps-accuracy-badge').innerText = "Location Blocked";
+        document.getElementById('gps-accuracy-badge').className = "text-[10px] bg-rose-900 border border-rose-700 text-rose-200 px-2 py-0.5 rounded-md font-semibold";
+        document.getElementById('btn-label').innerText = "Blocked";
+        document.getElementById('btn-icon').setAttribute('data-lucide', 'circle-slash');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    });
+
+    async function refreshRegisterState() {
+      const profile = JSON.parse(sessionStorage.getItem('user_profile'));
+      if (!profile || !window.supabaseInstance) return;
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Query today's attendance
+      try {
+        const { data, error } = await window.supabaseInstance
+          .from('attendance')
+          .select('*')
+          .eq('worker_id', profile.id)
+          .eq('attendance_date', todayStr)
+          .maybeSingle();
+
+        if (error) throw error;
+        todayRecord = data;
+
+        // If location is loaded, let's update button, else wait
+        if (currentCoords) {
+          enableActionBtn();
+        }
+      } catch (err) {
+        console.error("Error loading register status:", err);
+      }
+
+      // Query historical attendance logs (last 5)
+      try {
+        const { data: history, error } = await window.supabaseInstance
+          .from('attendance')
+          .select('*, sites(site_name)')
+          .eq('worker_id', profile.id)
+          .order('attendance_date', { ascending: false })
+          .limit(5);
+
+        if (error) throw error;
+
+        const list = document.getElementById('attendance-history-list');
+        list.innerHTML = '';
+
+        if (history && history.length > 0) {
+          history.forEach(log => {
+            const dateObj = new Date(log.attendance_date + 'T00:00:00');
+            const dateFmt = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            
+            const checkIn = new Date(log.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const checkOut = log.check_out_time ? new Date(log.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+            
+            const siteName = log.sites ? log.sites.site_name : 'Unknown Site';
+            
+            const card = document.createElement('div');
+            card.className = "bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-between shadow-sm";
+            card.innerHTML = `
+              <div class="space-y-1">
+                <span class="text-[10px] font-bold text-slate-400 uppercase">${siteName}</span>
+                <p class="font-bold text-sm text-slate-800">${dateFmt}</p>
+                <div class="flex gap-4 text-xs text-slate-500">
+                  <span class="flex items-center gap-1"><i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-emerald-500"></i> ${checkIn}</span>
+                  <span class="flex items-center gap-1"><i data-lucide="arrow-left-circle" class="w-3.5 h-3.5 text-rose-500"></i> ${checkOut}</span>
+                </div>
+              </div>
+              <span class="text-xs font-semibold ${log.check_out_time ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 border border-emerald-100 text-emerald-700'} px-2.5 py-1 rounded-full">
+                ${log.check_out_time ? 'Finished' : 'On Clock'}
+              </span>
+            `;
+            list.appendChild(card);
+          });
+        } else {
+          list.innerHTML = `
+            <div class="bg-white p-6 rounded-xl border border-slate-100 text-center text-xs text-slate-400 font-medium">
+              No attendance logs found.
+            </div>
+          `;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      } catch (err) {
+        console.error("Error building attendance list:", err);
+      }
+    }
+
+    function enableActionBtn() {
+      const btn = document.getElementById('btn-register-action');
+      const icon = document.getElementById('btn-icon');
+      const label = document.getElementById('btn-label');
+      const pulse = document.getElementById('btn-pulse-effect');
+      
+      btn.disabled = false;
+      btn.className = "w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 shadow-lg font-bold text-base transition border relative group cursor-pointer overflow-hidden";
+      btn.onclick = handleRegisterTap;
+
+      if (todayRecord) {
+        if (todayRecord.check_out_time) {
+          // Completed
+          btn.disabled = true;
+          btn.className = "w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 bg-slate-100 text-slate-400 shadow-md font-bold text-base transition border border-slate-200 cursor-not-allowed";
+          label.innerText = "Shift Done";
+          icon.setAttribute('data-lucide', 'check-circle');
+          pulse.className = "absolute inset-0 rounded-full bg-slate-100 opacity-0";
+        } else {
+          // Checked in, option is Check Out
+          btn.className += " bg-rose-50 border-rose-200 text-rose-600 shadow-rose-100 hover:shadow-xl hover:border-rose-300";
+          label.innerText = "Check Out";
+          icon.setAttribute('data-lucide', 'log-out');
+          pulse.className = "absolute inset-0 rounded-full bg-rose-100 scale-100 group-hover:scale-105 opacity-20 group-hover:opacity-40 animate-pulse";
+        }
+      } else {
+        // Not checked in, option is Check In
+        if (!activeSite) {
+          btn.disabled = true;
+          btn.className = "w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 bg-slate-100 text-slate-400 shadow-md font-bold text-base transition border border-slate-200 cursor-not-allowed";
+          label.innerText = "No Assignment";
+          icon.setAttribute('data-lucide', 'lock');
+        } else {
+          btn.className += " bg-blue-50 border-blue-200 text-blue-600 shadow-blue-100 hover:shadow-xl hover:border-blue-300";
+          label.innerText = "Check In";
+          icon.setAttribute('data-lucide', 'log-in');
+          pulse.className = "absolute inset-0 rounded-full bg-blue-100 scale-100 group-hover:scale-105 opacity-20 group-hover:opacity-40 animate-pulse";
+        }
+      }
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    async function handleRegisterTap() {
+      const btn = document.getElementById('btn-register-action');
+      const icon = document.getElementById('btn-icon');
+      const label = document.getElementById('btn-label');
+      
+      btn.disabled = true;
+      label.innerText = "Processing...";
+      icon.setAttribute('data-lucide', 'loader-2');
+      icon.classList.add('animate-spin');
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+
+      const profile = JSON.parse(sessionStorage.getItem('user_profile'));
+      if (!profile || !window.supabaseInstance) return;
+
+      try {
+        // Get fresh location coordinates for validation
+        const coords = await getCurrentLocation();
+        currentCoords = coords;
+
+        const timestampNow = new Date().toISOString();
+
+        if (todayRecord) {
+          // Action: Check Out
+          const { error } = await window.supabaseInstance
+            .from('attendance')
+            .update({
+              check_out_time: timestampNow
+            })
+            .eq('id', todayRecord.id);
+
+          if (error) throw error;
+
+          // Log Location details
+          await window.supabaseInstance
+            .from('location_logs')
+            .insert({
+              worker_id: profile.id,
+              site_id: activeSite.id,
+              latitude: coords.latitude,
+              longitude: coords.longitude
+            });
+
+          showToast("Checked out successfully!");
+        } else {
+          // Action: Check In
+          const { error } = await window.supabaseInstance
+            .from('attendance')
+            .insert({
+              worker_id: profile.id,
+              site_id: activeSite.id,
+              check_in_time: timestampNow,
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              attendance_date: timestampNow.split('T')[0],
+              status: 'present'
+            });
+
+          if (error) throw error;
+
+          // Log Location details
+          await window.supabaseInstance
+            .from('location_logs')
+            .insert({
+              worker_id: profile.id,
+              site_id: activeSite.id,
+              latitude: coords.latitude,
+              longitude: coords.longitude
+            });
+
+          showToast("Checked in successfully!");
+        }
+
+        // Refresh database states and UI buttons
+        await refreshRegisterState();
+      } catch (err) {
+        showToast(err.message || "Operation failed. Try again.", "error");
+        enableActionBtn();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worker Dashboard | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-md mx-auto px-4 py-6 space-y-6">
+
+    <!-- Welcome Header Card -->
+    <div class="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-5 text-white shadow-xl relative overflow-hidden">
+      <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-5 pointer-events-none">
+        <i data-lucide="zap" class="w-48 h-48"></i>
+      </div>
+      <div class="relative z-10 space-y-1">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Welcome Back</p>
+        <h2 id="worker-name-title" class="text-xl font-bold tracking-tight">Loading Profile...</h2>
+        <p id="today-date-str" class="text-xs text-blue-400 font-semibold"></p>
+      </div>
+    </div>
+
+    <!-- Assigned Site Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-50 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="map-pin" class="w-5 h-5 text-blue-600"></i>
+          <h3 class="font-bold text-sm text-slate-800">Assigned Job Site</h3>
+        </div>
+        <span id="site-status-badge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full border"></span>
+      </div>
+
+      <div id="site-loading-state" class="space-y-2 py-2">
+        <div class="h-4 w-2/3 skeleton rounded"></div>
+        <div class="h-3 w-1/2 skeleton rounded"></div>
+      </div>
+
+      <div id="site-details-container" class="hidden space-y-2.5">
+        <h4 id="assigned-site-name" class="font-bold text-base text-slate-800 leading-snug">No active assignment</h4>
+        <p id="assigned-site-address" class="text-xs text-slate-500 leading-relaxed"></p>
+        
+        <div class="flex items-center gap-4 text-xs pt-1">
+          <span class="flex items-center gap-1 text-slate-600">
+            <i data-lucide="briefcase" class="w-3.5 h-3.5"></i>
+            <span id="assigned-site-client">--</span>
+          </span>
+          <span id="assigned-site-code-badge" class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-mono font-semibold">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Today's Attendance Status Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-center justify-between">
+      <div class="space-y-1">
+        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Attendance Status</h3>
+        <p id="attendance-status-text" class="font-extrabold text-sm text-slate-800">Checking status...</p>
+        <p id="attendance-time-text" class="text-xs text-slate-500"></p>
+      </div>
+      <div id="attendance-status-icon" class="p-3.5 rounded-full bg-slate-50 text-slate-400">
+        <i data-lucide="circle-dashed" class="w-6 h-6"></i>
+      </div>
+    </div>
+
+    <!-- Quick Action Grid -->
+    <div class="space-y-3">
+      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Quick Actions</h3>
+      <div class="grid grid-cols-2 gap-3">
+        
+        <!-- Attendance button -->
+        <a href="attendance.html" id="btn-action-attendance" class="interactive-card bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col items-center justify-center text-center gap-3 text-slate-800 hover:border-blue-300">
+          <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+            <i data-lucide="calendar" class="w-6 h-6"></i>
+          </div>
+          <span class="font-bold text-sm tracking-tight" id="lbl-action-attendance">Register</span>
+        </a>
+
+        <!-- Upload Proof button -->
+        <a href="upload.html" class="interactive-card bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col items-center justify-center text-center gap-3 text-slate-800 hover:border-blue-300">
+          <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+            <i data-lucide="camera" class="w-6 h-6"></i>
+          </div>
+          <span class="font-bold text-sm tracking-tight">Upload Photo</span>
+        </a>
+
+        <!-- View Profile button -->
+        <a href="profile.html" class="interactive-card bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col items-center justify-center text-center gap-3 text-slate-800 hover:border-blue-300 col-span-2">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-slate-100 text-slate-700 rounded-lg">
+              <i data-lucide="user" class="w-5 h-5"></i>
+            </div>
+            <span class="font-bold text-sm text-slate-800 tracking-tight">View Profile Details</span>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Set Date String
+      const options = { weekday: 'long', month: 'short', day: 'numeric' };
+      document.getElementById('today-date-str').innerText = new Date().toLocaleDateString('en-US', options);
+
+      const profile = JSON.parse(sessionStorage.getItem('user_profile'));
+      if (!profile) return;
+
+      document.getElementById('worker-name-title').innerText = profile.full_name;
+
+      if (!window.supabaseInstance) return;
+
+      // 1. Fetch site assignments
+      try {
+        const { data: assignments, error } = await window.supabaseInstance
+          .from('worker_assignments')
+          .select('*, sites(*)')
+          .eq('worker_id', profile.id)
+          .maybeSingle();
+
+        document.getElementById('site-loading-state').classList.add('hidden');
+        document.getElementById('site-details-container').classList.remove('hidden');
+
+        if (error) throw error;
+
+        if (assignments && assignments.sites) {
+          const site = assignments.sites;
+          
+          // Store active site in sessionStorage for easy retrieval by attendance page
+          sessionStorage.setItem('assigned_site', JSON.stringify(site));
+
+          document.getElementById('assigned-site-name').innerText = site.site_name;
+          document.getElementById('assigned-site-address').innerText = site.address || 'No address provided';
+          document.getElementById('assigned-site-client').innerText = site.client_name || 'Generic Client';
+          document.getElementById('assigned-site-code-badge').innerText = site.site_code || 'CODE';
+          
+          const statusBadge = document.getElementById('site-status-badge');
+          statusBadge.classList.remove('hidden');
+          statusBadge.innerText = site.status.toUpperCase();
+          if (site.status === 'active') {
+            statusBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700";
+          } else {
+            statusBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700";
+          }
+
+        } else {
+          sessionStorage.removeItem('assigned_site');
+          document.getElementById('assigned-site-name').innerText = "Unassigned";
+          document.getElementById('assigned-site-address').innerText = "You have not been assigned to a job site yet.";
+        }
+      } catch (err) {
+        console.error("Error fetching site details:", err);
+      }
+
+      // 2. Fetch today's attendance status
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { data: attendance, error } = await window.supabaseInstance
+          .from('attendance')
+          .select('*')
+          .eq('worker_id', profile.id)
+          .eq('attendance_date', todayStr)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        const statusText = document.getElementById('attendance-status-text');
+        const timeText = document.getElementById('attendance-time-text');
+        const statusIcon = document.getElementById('attendance-status-icon');
+        const btnAttendance = document.getElementById('lbl-action-attendance');
+
+        if (attendance) {
+          const checkIn = new Date(attendance.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          if (attendance.check_out_time) {
+            // Check out complete
+            const checkOut = new Date(attendance.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            statusText.innerText = "Shift Completed";
+            statusText.className = "font-extrabold text-sm text-slate-500";
+            timeText.innerText = `In: ${checkIn} | Out: ${checkOut}`;
+            statusIcon.className = "p-3.5 rounded-full bg-slate-100 text-slate-400";
+            statusIcon.innerHTML = `<i data-lucide="check-circle-2" class="w-6 h-6 text-slate-500"></i>`;
+            btnAttendance.innerText = "View History";
+          } else {
+            // Checked in
+            statusText.innerText = "Currently Checked In";
+            statusText.className = "font-extrabold text-sm text-emerald-600";
+            timeText.innerText = `Checked in at ${checkIn}`;
+            statusIcon.className = "p-3.5 rounded-full bg-emerald-50 text-emerald-600";
+            statusIcon.innerHTML = `<i data-lucide="clock" class="w-6 h-6 text-emerald-600"></i>`;
+            btnAttendance.innerText = "Check Out";
+          }
+        } else {
+          // Not checked in
+          statusText.innerText = "Not Checked In";
+          statusText.className = "font-extrabold text-sm text-rose-500";
+          timeText.innerText = "No attendance recorded for today.";
+          statusIcon.className = "p-3.5 rounded-full bg-rose-50 text-rose-500";
+          statusIcon.innerHTML = `<i data-lucide="circle-slash" class="w-6 h-6 text-rose-500"></i>`;
+          btnAttendance.innerText = "Check In";
+        }
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      } catch (err) {
+        console.error("Error fetching attendance details:", err);
+      }
+    });
+  </script>
+</body>
+</html>

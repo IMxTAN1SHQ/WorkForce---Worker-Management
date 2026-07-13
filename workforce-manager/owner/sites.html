@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Sites | Tejal Enterprises</title>
+  <!-- Tailwind CSS -->
+  <script src="assets/js/tailwind-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Header & Action Panel -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
+      <div>
+        <h2 class="font-extrabold text-2xl text-slate-800 tracking-tight">Job Sites Management</h2>
+        <p class="text-xs text-slate-500 font-medium">Create job sites, edit boundaries, and assign electricians</p>
+      </div>
+      <button onclick="openSiteModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg shadow-sm flex items-center justify-center gap-2 text-sm transition cursor-pointer">
+        <i data-lucide="folder-plus" class="w-4 h-4"></i> Create Site
+      </button>
+    </div>
+
+    <!-- Sites Table Grid -->
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100 text-left text-sm">
+          <thead class="bg-slate-50 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            <tr>
+              <th scope="col" class="px-6 py-4">Site Details</th>
+              <th scope="col" class="px-6 py-4">Client Name</th>
+              <th scope="col" class="px-6 py-4">Workers Assigned</th>
+              <th scope="col" class="px-6 py-4">Status</th>
+              <th scope="col" class="px-6 py-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          
+          <tbody id="sites-table-body" class="divide-y divide-slate-100">
+            <!-- Loading state -->
+            <tr>
+              <td colspan="5" class="px-6 py-10 text-center text-slate-400 font-medium">
+                <div class="flex items-center justify-center gap-2">
+                  <i data-lucide="loader-2" class="w-5 h-5 animate-spin text-blue-600"></i>
+                  <span>Retrieving job sites database...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Create / Edit Site Drawer Modal -->
+  <div id="site-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-xl overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="site-modal-content">
+      
+      <!-- Modal Header -->
+      <div class="bg-slate-900 text-white px-6 py-5 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i id="modal-icon" data-lucide="folder-plus" class="w-5 h-5 text-blue-400"></i>
+          <h2 id="modal-title" class="font-bold text-lg">Create Job Site</h2>
+        </div>
+        <button onclick="closeSiteModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form -->
+      <form id="site-form">
+        <input type="hidden" id="edit-site-id" />
+        
+        <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2 sm:col-span-1">
+              <label for="site-name" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Site Name</label>
+              <input type="text" id="site-name" required placeholder="e.g. Downtown Plaza" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div class="col-span-2 sm:col-span-1">
+              <label for="site-code" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Site Code (Unique)</label>
+              <input type="text" id="site-code" required placeholder="e.g. DP-101" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div class="col-span-2 sm:col-span-1">
+              <label for="client-name" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Client Name</label>
+              <input type="text" id="client-name" placeholder="e.g. Acme Corp" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div class="col-span-2 sm:col-span-1">
+              <label for="site-status" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Status</label>
+              <select id="site-status" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm bg-white">
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+
+            <div class="col-span-2">
+              <label for="site-address" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Site Address</label>
+              <input type="text" id="site-address" placeholder="e.g. 123 Main St, New York" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div class="col-span-2 sm:col-span-1">
+              <label for="site-lat" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Latitude (GPS)</label>
+              <input type="number" step="any" id="site-lat" placeholder="e.g. 40.7127" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div class="col-span-2 sm:col-span-1">
+              <label for="site-lng" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Longitude (GPS)</label>
+              <input type="number" step="any" id="site-lng" placeholder="e.g. -74.0059" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm" />
+            </div>
+
+            <div class="col-span-2">
+              <label for="site-description" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Description</label>
+              <textarea id="site-description" rows="2" placeholder="Tasks, instructions, notes..." class="w-full px-3.5 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm"></textarea>
+            </div>
+          </div>
+
+          <!-- Assignment details section -->
+          <div id="assignments-section" class="border-t border-slate-100 pt-4 hidden">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Assign Electricians</h3>
+            <div id="workers-checklist-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+              <!-- Dynamically populated worker lists -->
+              <span class="text-xs text-slate-400">Loading active electricians list...</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Submit buttons -->
+        <div class="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+          <button type="button" onclick="closeSiteModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition font-medium font-medium">Cancel</button>
+          <button type="submit" id="btn-save-site" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition font-semibold">Save Site</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- Supabase Client & Common Inits -->
+  <script src="../assets/js/supabase-client.js"></script>
+  <script src="../assets/js/common.js"></script>
+
+  <script>
+    let sitesList = [];
+    let activeWorkers = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Fetch sites database
+      await loadSites();
+      
+      // 2. Pre-fetch active workers for assignments checklist
+      await loadActiveWorkers();
+
+      // Check for URL parameters (?action=new) to open modal
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('action') === 'new') {
+        openSiteModal();
+      }
+    });
+
+    async function loadSites() {
+      if (!window.supabaseInstance) return;
+
+      try {
+        // Fetch sites combined with assignment worker details
+        const { data, error } = await window.supabaseInstance
+          .from('sites')
+          .select('*, worker_assignments(id, worker_id(id, full_name))')
+          .order('site_name', { ascending: true });
+
+        if (error) throw error;
+        sitesList = data || [];
+        renderSitesTable(sitesList);
+
+      } catch (err) {
+        showToast(err.message || "Failed to load sites.", "error");
+      }
+    }
+
+    async function loadActiveWorkers() {
+      if (!window.supabaseInstance) return;
+
+      try {
+        const { data, error } = await window.supabaseInstance
+          .from('profiles')
+          .select('id, full_name, status')
+          .eq('role', 'worker')
+          .eq('status', 'active')
+          .order('full_name', { ascending: true });
+
+        if (error) throw error;
+        activeWorkers = data || [];
+      } catch (err) {
+        console.error("Error loading workers checklist:", err);
+      }
+    }
+
+    function renderSitesTable(list) {
+      const tbody = document.getElementById('sites-table-body');
+      tbody.innerHTML = '';
+
+      if (list.length > 0) {
+        list.forEach(site => {
+          // Format assignments
+          const assignedCount = site.worker_assignments ? site.worker_assignments.length : 0;
+          const assignedNames = site.worker_assignments 
+            ? site.worker_assignments.map(wa => wa.worker_id ? wa.worker_id.full_name : 'Worker').join(', ') 
+            : '';
+
+          let statusStyle = 'bg-slate-100 border border-slate-200 text-slate-600';
+          if (site.status === 'active') {
+            statusStyle = 'bg-emerald-50 border border-emerald-100 text-emerald-700';
+          } else if (site.status === 'paused') {
+            statusStyle = 'bg-amber-50 border border-amber-100 text-amber-700';
+          }
+
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-50/50 transition";
+          tr.innerHTML = `
+            <td class="px-6 py-4.5">
+              <div>
+                <span class="font-bold text-slate-800 text-sm block leading-snug">${site.site_name}</span>
+                <span class="text-xs text-slate-400 font-medium leading-relaxed">${site.address || 'No address set'}</span>
+              </div>
+            </td>
+            <td class="px-6 py-4.5 whitespace-nowrap">
+              <span class="text-slate-700 font-medium text-sm">${site.client_name || '--'}</span>
+            </td>
+            <td class="px-6 py-4.5">
+              <div>
+                <span class="text-sm font-bold text-slate-700 block">${assignedCount} Assigned</span>
+                <span class="text-xs text-slate-400 line-clamp-1" title="${assignedNames}">${assignedNames || 'No workers assigned'}</span>
+              </div>
+            </td>
+            <td class="px-6 py-4.5 whitespace-nowrap">
+              <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full ${statusStyle}">
+                ${site.status.toUpperCase()}
+              </span>
+            </td>
+            <td class="px-6 py-4.5 whitespace-nowrap text-right text-sm font-medium">
+              <button onclick="openSiteModal('${site.id}')" class="text-blue-600 hover:text-blue-900 bg-blue-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1 inline-flex cursor-pointer">
+                <i data-lucide="settings" class="w-3.5 h-3.5"></i> Config
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-10 text-center text-slate-400 font-medium">
+              No job sites registered. Click "Create Site" to begin.
+            </td>
+          </tr>
+        `;
+      }
+      
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // Modal controls
+    function openSiteModal(siteId = '') {
+      const modal = document.getElementById('site-modal');
+      const content = document.getElementById('site-modal-content');
+      
+      modal.classList.remove('hidden');
+      setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 50);
+
+      const title = document.getElementById('modal-title');
+      const icon = document.getElementById('modal-icon');
+      const assignmentsSection = document.getElementById('assignments-section');
+      
+      // Default Form Reset
+      document.getElementById('site-form').reset();
+      document.getElementById('edit-site-id').value = '';
+      
+      if (siteId) {
+        // Edit Mode
+        const site = sitesList.find(s => s.id === siteId);
+        if (!site) return;
+
+        title.innerText = "Configure Job Site";
+        icon.setAttribute('data-lucide', 'folder-cog');
+        
+        document.getElementById('edit-site-id').value = site.id;
+        document.getElementById('site-name').value = site.site_name;
+        document.getElementById('site-code').value = site.site_code || '';
+        document.getElementById('client-name').value = site.client_name || '';
+        document.getElementById('site-status').value = site.status || 'active';
+        document.getElementById('site-address').value = site.address || '';
+        document.getElementById('site-lat').value = site.latitude || '';
+        document.getElementById('site-lng').value = site.longitude || '';
+        document.getElementById('site-description').value = site.description || '';
+        
+        // Show assignments checklist
+        assignmentsSection.classList.remove('hidden');
+        renderWorkersChecklist(site);
+      } else {
+        // Create Mode
+        title.innerText = "Create Job Site";
+        icon.setAttribute('data-lucide', 'folder-plus');
+        assignmentsSection.classList.add('hidden');
+      }
+
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeSiteModal() {
+      const modal = document.getElementById('site-modal');
+      const content = document.getElementById('site-modal-content');
+      
+      content.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    // Render assignments checklists inside modal
+    function renderWorkersChecklist(site) {
+      const container = document.getElementById('workers-checklist-container');
+      container.innerHTML = '';
+
+      if (activeWorkers.length === 0) {
+        container.innerHTML = '<span class="text-xs text-slate-400 col-span-2">No active worker accounts found. Add workers first.</span>';
+        return;
+      }
+
+      // Map currently assigned worker IDs
+      const assignedIds = site.worker_assignments 
+        ? site.worker_assignments.map(wa => wa.worker_id ? wa.worker_id.id : null).filter(Boolean)
+        : [];
+
+      activeWorkers.forEach(worker => {
+        const checked = assignedIds.includes(worker.id) ? 'checked' : '';
+        const item = document.createElement('label');
+        item.className = "flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-100 rounded-lg hover:bg-slate-100 cursor-pointer transition text-xs font-semibold text-slate-700";
+        item.innerHTML = `
+          <input type="checkbox" name="assign-workers" value="${worker.id}" ${checked} class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" />
+          <span>${worker.full_name}</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // Submit Site Form
+    document.getElementById('site-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!window.supabaseInstance) return;
+
+      const btn = document.getElementById('btn-save-site');
+      const id = document.getElementById('edit-site-id').value;
+
+      const name = document.getElementById('site-name').value.trim();
+      const code = document.getElementById('site-code').value.trim().toUpperCase();
+      const client = document.getElementById('client-name').value.trim();
+      const status = document.getElementById('site-status').value;
+      const address = document.getElementById('site-address').value.trim();
+      const lat = document.getElementById('site-lat').value;
+      const lng = document.getElementById('site-lng').value;
+      const desc = document.getElementById('site-description').value.trim();
+
+      btn.disabled = true;
+      btn.innerText = "Saving...";
+
+      try {
+        let siteId = id;
+
+        if (id) {
+          // 1. Edit Site Table Row
+          const { error } = await window.supabaseInstance
+            .from('sites')
+            .update({
+              site_name: name,
+              site_code: code,
+              client_name: client || null,
+              status,
+              address: address || null,
+              latitude: lat ? parseFloat(lat) : null,
+              longitude: lng ? parseFloat(lng) : null,
+              description: desc || null
+            })
+            .eq('id', id);
+
+          if (error) throw error;
+
+          // 2. Process worker assignments checkboxes
+          const checkboxes = document.querySelectorAll('input[name="assign-workers"]:checked');
+          const checkedWorkerIds = Array.from(checkboxes).map(cb => cb.value);
+
+          // Get active profile for assignments 'assigned_by' record
+          const adminProfile = JSON.parse(sessionStorage.getItem('user_profile'));
+
+          // Delete all current assignments
+          await window.supabaseInstance
+            .from('worker_assignments')
+            .delete()
+            .eq('site_id', siteId);
+
+          // Insert newly checked assignments
+          if (checkedWorkerIds.length > 0) {
+            const insertPayload = checkedWorkerIds.map(wid => ({
+              worker_id: wid,
+              site_id: siteId,
+              assigned_by: adminProfile ? adminProfile.id : null
+            }));
+
+            const { error: assignError } = await window.supabaseInstance
+              .from('worker_assignments')
+              .insert(insertPayload);
+
+            if (assignError) throw assignError;
+          }
+
+          showToast("Job site & assignments updated!");
+        } else {
+          // Create Site Row
+          const { data, error } = await window.supabaseInstance
+            .from('sites')
+            .insert({
+              site_name: name,
+              site_code: code,
+              client_name: client || null,
+              status,
+              address: address || null,
+              latitude: lat ? parseFloat(lat) : null,
+              longitude: lng ? parseFloat(lng) : null,
+              description: desc || null
+            })
+            .select('id')
+            .single();
+
+          if (error) throw error;
+          showToast("Job site created successfully!");
+        }
+
+        closeSiteModal();
+        await loadSites();
+      } catch (err) {
+        showToast(err.message || "Failed to save site.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Save Site";
+      }
+    });
+  </script>
+</body>
+</html>
