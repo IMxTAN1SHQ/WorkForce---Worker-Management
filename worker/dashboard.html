@@ -125,11 +125,19 @@
       if (!window.supabaseInstance) return;
 
       // 1. Fetch site assignments
+      // FIX: use order + limit(1) instead of relying solely on maybeSingle().
+      // maybeSingle() THROWS if more than one row is returned — if a worker
+      // ever ends up with duplicate assignment rows (a past bug), this used
+      // to silently fail and leave sessionStorage stale/empty, breaking the
+      // Upload page ("No Assigned Site") even though the dashboard briefly
+      // showed a site on a prior successful load.
       try {
         const { data: assignments, error } = await window.supabaseInstance
           .from('worker_assignments')
           .select('*, sites(*)')
           .eq('worker_id', profile.id)
+          .order('assigned_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         document.getElementById('site-loading-state').classList.add('hidden');
@@ -164,6 +172,15 @@
         }
       } catch (err) {
         console.error("Error fetching site details:", err);
+        // FIX: on error, don't leave a stale/incorrect site cached from a
+        // previous session — clear it so Upload/Profile pages correctly
+        // reflect "unassigned" rather than acting on stale data.
+        sessionStorage.removeItem('assigned_site');
+        document.getElementById('site-loading-state').classList.add('hidden');
+        document.getElementById('site-details-container').classList.remove('hidden');
+        document.getElementById('assigned-site-name').innerText = "Unable to load assignment";
+        document.getElementById('assigned-site-name').className = "font-bold text-base text-rose-500 leading-snug";
+        document.getElementById('assigned-site-address').innerText = "Please refresh, or contact admin if this persists.";
       }
 
       // 2. Fetch today's attendance status

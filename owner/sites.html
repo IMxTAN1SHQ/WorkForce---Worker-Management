@@ -401,14 +401,24 @@
           // Get active profile for assignments 'assigned_by' record
           const adminProfile = JSON.parse(sessionStorage.getItem('user_profile'));
 
-          // Delete all current assignments
+          // Delete all current assignments for THIS site (handles unchecked workers)
           await window.supabaseInstance
             .from('worker_assignments')
             .delete()
             .eq('site_id', siteId);
 
-          // Insert newly checked assignments
+          // IMPORTANT: also delete any assignment these workers have to
+          // OTHER sites first. A worker can only ever be assigned to ONE
+          // site at a time — without this, checking a worker here while
+          // they're still assigned elsewhere creates a duplicate row,
+          // which breaks the worker/admin dashboards (.maybeSingle() query
+          // errors out when more than one assignment row exists).
           if (checkedWorkerIds.length > 0) {
+            await window.supabaseInstance
+              .from('worker_assignments')
+              .delete()
+              .in('worker_id', checkedWorkerIds);
+
             const insertPayload = checkedWorkerIds.map(wid => ({
               worker_id: wid,
               site_id: siteId,
